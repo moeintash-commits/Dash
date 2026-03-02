@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart KPI Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0a12; --bg2:#111120; --bg3:#181830; --border:#1e1e3a;
+    --accent:#7c6aff; --accent2:#b8a9ff;
+    --green:#2ecc71; --red:#e74c3c;
+    --text:#e8e8f5; --muted:#555570;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
+
+  header{background:var(--bg2);padding:14px 28px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,0,0,0.4);}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;}
+  .logo h1{font-family:'Space Mono',monospace;font-size:1rem;color:var(--text);}
+  .logo span{font-size:0.68rem;color:var(--muted);display:block;}
+
+  .api-bar{background:var(--bg3);padding:10px 28px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .api-bar label{font-size:0.75rem;color:var(--accent2);white-space:nowrap;font-weight:500;}
+  input,select{padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.8rem;font-family:'DM Sans',sans-serif;transition:border-color 0.2s;}
+  input:focus,select:focus{outline:none;border-color:var(--accent);}
+  .api-bar input[type=password]{flex:1;min-width:200px;}
+  .btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;font-family:'DM Sans',sans-serif;font-weight:500;transition:all 0.2s;white-space:nowrap;}
+  .btn-primary{background:var(--accent);color:white;}
+  .btn-primary:hover{background:#6a58ee;transform:translateY(-1px);box-shadow:0 4px 14px rgba(124,106,255,0.35);}
+  .btn-danger{background:var(--red);color:white;}
+  .btn-secondary{background:var(--bg2);color:#aaa;border:1px solid var(--border);}
+  .btn-secondary:hover{border-color:var(--accent);color:var(--accent2);}
+
+  .main{display:flex;height:calc(100vh - 105px);}
+
+  .sidebar{width:265px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;flex-shrink:0;}
+  .stitle{font-family:'Space Mono',monospace;font-size:0.63rem;color:var(--accent);text-transform:uppercase;letter-spacing:2px;}
+  .ig{display:flex;flex-direction:column;gap:4px;}
+  .ig label{font-size:0.72rem;color:var(--muted);}
+  .ig input,.ig select{width:100%;}
+  hr{border:none;border-top:1px solid var(--border);}
+
+  .kpi-item{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:9px 10px;display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;transition:border-color 0.2s;}
+  .kpi-item:hover{border-color:var(--accent);}
+  .kval{color:var(--accent);font-weight:600;font-family:'Space Mono',monospace;}
+  .up{color:var(--green);}.down{color:var(--red);}
+  .del{color:var(--border);cursor:pointer;transition:color 0.2s;}.del:hover{color:var(--red);}
+
+  .upload-zone{border:2px dashed var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all 0.2s;font-size:0.75rem;color:var(--muted);}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);color:var(--accent2);background:rgba(124,106,255,0.04);}
+  #csvInput{display:none;}
+
+  .content{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:18px;}
+
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px;}
+  .kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;overflow:hidden;transition:transform 0.2s,box-shadow 0.2s,border-color 0.2s;}
+  .kpi-card:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(124,106,255,0.08);border-color:rgba(124,106,255,0.3);}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--cc,var(--accent));}
+  .kpi-card .cp{font-size:0.63rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;}
+  .kpi-card .cn{font-size:0.82rem;color:#bbb;margin:3px 0 6px;}
+  .kpi-card .cv{font-family:'Space Mono',monospace;font-size:1.45rem;font-weight:700;color:var(--text);}
+  .kpi-card .cu{font-size:0.75rem;color:var(--muted);}
+  .kpi-card .cc-badge{font-size:0.72rem;margin-top:6px;}
+  .pos{color:var(--green);}.neg{color:var(--red);}.neu{color:var(--muted);}
+
+  .charts-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;}
+  .chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;}
+  .chart-box h4{font-size:0.75rem;color:var(--accent2);margin-bottom:14px;font-family:'Space Mono',monospace;}
+  .chart-box canvas{max-height:200px;}
+
+  .panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;}
+  .pheader{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+  .pheader h3{font-family:'Space Mono',monospace;font-size:0.83rem;color:var(--accent2);}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;}
+  .dot.green{background:var(--green);}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+  .ai-controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+  .ai-output{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px;min-height:120px;font-size:0.82rem;line-height:1.8;color:#ccc;white-space:pre-wrap;}
+  .ai-output.loading{color:var(--accent);}
+  .ai-output.error{color:var(--red);}
+
+  /* CHAT */
+  .chat-messages{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:12px;margin-bottom:12px;}
+  .msg{display:flex;gap:10px;max-width:88%;}
+  .msg.user{align-self:flex-end;flex-direction:row-reverse;}
+  .msg-bubble{padding:10px 14px;border-radius:10px;font-size:0.82rem;line-height:1.65;white-space:pre-wrap;}
+  .msg.user .msg-bubble{background:var(--accent);color:white;border-radius:10px 10px 2px 10px;}
+  .msg.ai .msg-bubble{background:var(--bg3);color:#ddd;border:1px solid var(--border);border-radius:10px 10px 10px 2px;}
+  .msg-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;flex-shrink:0;margin-top:2px;}
+  .msg.user .msg-avatar{background:var(--accent);}
+  .msg.ai .msg-avatar{background:var(--bg3);border:1px solid var(--border);}
+  .chat-input-row{display:flex;gap:8px;}
+  .chat-input-row input{flex:1;padding:10px 14px;font-size:0.82rem;border-radius:8px;}
+  .chat-empty{text-align:center;color:var(--muted);font-size:0.8rem;margin:auto;padding:20px;}
+  .chat-empty .ce-icon{font-size:2rem;margin-bottom:8px;opacity:0.5;}
+  .typing-indicator{display:flex;gap:4px;padding:12px 14px;}
+  .typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:bounce 1.2s infinite;}
+  .typing-indicator span:nth-child(2){animation-delay:0.2s;}
+  .typing-indicator span:nth-child(3){animation-delay:0.4s;}
+  @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+
+  .badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:0.65rem;font-weight:600;text-transform:uppercase;}
+  .bg{background:#4285f4;color:#fff;}.bm{background:#1877f2;color:#fff;}
+  .bt{background:#ff0050;color:#fff;}.bl{background:#0a66c2;color:#fff;}
+  .bx{background:#1da1f2;color:#fff;}.bc{background:var(--accent);color:#fff;}
+  .empty{text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;grid-column:1/-1;}
+  .empty .ei{font-size:2.5rem;margin-bottom:12px;opacity:0.3;}
+  .tag{font-size:0.68rem;background:var(--bg3);color:var(--accent2);padding:3px 9px;border-radius:4px;font-family:'Space Mono',monospace;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div><h1>KPI Dashboard</h1><span>AI-Powered Analytics</span></div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <span id="kpiCount" class="tag">0 KPIs</span>
+    <span id="apiStatus" style="font-size:0.72rem;color:var(--muted)">API: Not connected</span>
+  </div>
+</header>
+
+<div class="api-bar">
+  <label>🔑 OpenAI API Key:</label>
+  <input type="password" id="apiKey" placeholder="sk-..." />
+  <select id="aiModel">
+    <option value="gpt-4o">GPT-4o</option>
+    <option value="gpt-4-turbo">GPT-4 Turbo</option>
+    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+  </select>
+  <button class="btn btn-primary" onclick="saveApiKey()">💾 Save Key</button>
+  <button class="btn btn-secondary" onclick="loadSample()">📥 Load Sample Data</button>
+  <button class="btn btn-danger" onclick="clearAll()">🗑️ Clear All</button>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="stitle">➕ Add KPI Manually</div>
+    <div class="ig"><label>Platform</label>
+      <select id="nPlat">
+        <option value="google">Google Ads</option>
+        <option value="meta">Meta (FB/IG)</option>
+        <option value="tiktok">TikTok</option>
+        <option value="linkedin">LinkedIn</option>
+        <option value="twitter">Twitter/X</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="ig"><label>KPI Name</label><input type="text" id="nName" placeholder="e.g. CTR, ROAS, CPC" /></div>
+    <div class="ig"><label>Current Value</label><input type="number" id="nVal" placeholder="e.g. 3.5" /></div>
+    <div class="ig"><label>Previous Value (optional)</label><input type="number" id="nPrev" placeholder="for % change calc" /></div>
+    <div class="ig"><label>Unit (optional)</label><input type="text" id="nUnit" placeholder="%, $, x, etc." /></div>
+    <button class="btn btn-primary" onclick="addKPI()" style="width:100%">➕ Add KPI</button>
+    <hr>
+    <div class="stitle">📁 Upload CSV</div>
+    <div class="upload-zone" onclick="document.getElementById('csvInput').click()" id="uploadZone">
+      <div style="font-size:1.8rem;margin-bottom:6px">📂</div>
+      <div>Click or Drag & Drop</div>
+      <div style="font-size:0.65rem;margin-top:4px;color:#333">platform, name, value, prev_value, unit</div>
+    </div>
+    <input type="file" id="csvInput" accept=".csv" onchange="handleCSV(event)">
+    <hr>
+    <div class="stitle">📋 KPI List</div>
+    <div id="kpiList"><div style="color:#333;font-size:0.75rem;text-align:center;padding:8px">No KPIs added yet</div></div>
+  </div>
+
+  <div class="content">
+
+    <div id="cardsGrid" class="cards-grid">
+      <div class="empty"><div class="ei">📊</div><div>Add KPIs manually or upload a CSV to get started</div></div>
+    </div>
+
+    <div class="charts-grid" id="chartsGrid"></div>
+
+    <!-- AI ANALYSIS PANEL -->
+    <div class="panel">
+      <div class="pheader"><div class="dot"></div><h3>AI Analysis with ChatGPT</h3></div>
+      <div class="ai-controls">
+        <select id="aType">
+          <option value="full">Full Analysis (Decline + Growth + Recommendations)</option>
+          <option value="decline">Reasons for KPI Decline</option>
+          <option value="improvement">Reasons for KPI Improvement</option>
+          <option value="recommendations">Actionable Recommendations</option>
+          <option value="forecast">Trend Forecast</option>
+        </select>
+        <button class="btn btn-primary" onclick="analyzeWithAI()">🚀 Analyze</button>
+        <button class="btn btn-secondary" onclick="clearOutput()">🗑️ Clear</button>
+      </div>
+      <div id="aiOutput" class="ai-output">Analysis results will appear here...</div>
+    </div>
+
+    <!-- CHAT PANEL -->
+    <div class="panel">
+      <div class="pheader"><div class="dot green"></div><h3>Chat About Your Data</h3></div>
+      <div id="chatMessages" class="chat-messages">
+        <div class="chat-empty">
+          <div class="ce-icon">💬</div>
+          <div>Upload a CSV or add KPIs, then ask anything about your data.<br>
+          <span style="font-size:0.72rem;color:#333;margin-top:6px;display:block">e.g. "Which platform has the worst CTR?" · "Why might ROAS have dropped?" · "Compare my platforms"</span></div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Ask a question about your KPI data..." onkeydown="if(event.key==='Enter')sendChat()" />
+        <button class="btn btn-primary" onclick="sendChat()">Send ➤</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let kpis=[],charts={},chatHistory=[];
+const pColors={google:'#4285f4',meta:'#1877f2',tiktok:'#ff0050',linkedin:'#0a66c2',twitter:'#1da1f2',custom:'#7c6aff'};
+const pBadge={google:'bg',meta:'bm',tiktok:'bt',linkedin:'bl',twitter:'bx',custom:'bc'};
+
+function saveApiKey(){
+  const k=document.getElementById('apiKey').value.trim();
+  if(!k){alert('Please enter your API Key');return;}
+  sessionStorage.setItem('oai',k);
+  const s=document.getElementById('apiStatus');
+  s.textContent='✅ Connected';s.style.color='#2ecc71';
+}
+function getKey(){return document.getElementById('apiKey').value.trim()||sessionStorage.getItem('oai')||'';}
+function calcCh(k){if(k.prev===null||isNaN(k.prev))return null;return((k.val-k.prev)/Math.abs(k.prev))*100;}
+function kpiSummary(){
+  if(!kpis.length)return'No KPI data available.';
+  return kpis.map(k=>{
+    const ch=calcCh(k);
+    return`- [${k.plat}] ${k.name}: ${k.val}${k.unit}${k.prev!==null&&!isNaN(k.prev)?` (prev: ${k.prev}${k.unit}, change: ${ch!==null?ch.toFixed(1)+'%':'N/A'})`:''}`;
+  }).join('\n');
+}
+
+function addKPI(){
+  const p=document.getElementById('nPlat').value,n=document.getElementById('nName').value.trim(),v=parseFloat(document.getElementById('nVal').value),pr=parseFloat(document.getElementById('nPrev').value),u=document.getElementById('nUnit').value.trim();
+  if(!n||isNaN(v)){alert('Name and current value are required');return;}
+  kpis.push({id:Date.now(),plat:p,name:n,val:v,prev:isNaN(pr)?null:pr,unit:u});
+  ['nName','nVal','nPrev','nUnit'].forEach(id=>document.getElementById(id).value='');
+  render();
+}
+function delKPI(id){kpis=kpis.filter(k=>k.id!==id);render();}
+
+function render(){
+  document.getElementById('kpiCount').textContent=`${kpis.length} KPIs`;
+  renderList();renderCards();renderCharts();
+}
+function renderList(){
+  const el=document.getElementById('kpiList');
+  if(!kpis.length){el.innerHTML='<div style="color:#333;font-size:0.75rem;text-align:center;padding:8px">No KPIs added yet</div>';return;}
+  el.innerHTML=kpis.map(k=>{
+    const ch=calcCh(k);const cls=ch===null?'':ch>=0?'up':'down';const ct=ch===null?'':`${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}%`;
+    return`<div class="kpi-item"><div><span class="badge ${pBadge[k.plat]||'bc'}">${k.plat}</span><div style="color:#bbb;margin-top:2px;font-size:0.75rem">${k.name}</div></div><div style="text-align:right"><div class="kval">${k.val}${k.unit}</div><div class="${cls}" style="font-size:0.7rem">${ct}</div></div><div class="del" onclick="delKPI(${k.id})">✕</div></div>`;
+  }).join('');
+}
+function renderCards(){
+  const g=document.getElementById('cardsGrid');
+  if(!kpis.length){g.innerHTML='<div class="empty"><div class="ei">📊</div><div>Add KPIs manually or upload a CSV to get started</div></div>';return;}
+  g.innerHTML=kpis.map(k=>{
+    const ch=calcCh(k);const cls=ch===null?'neu':ch>=0?'pos':'neg';const ct=ch===null?'No comparison':`${ch>=0?'▲':'▼'} ${Math.abs(ch).toFixed(1)}% vs prev`;
+    return`<div class="kpi-card" style="--cc:${pColors[k.plat]||'#7c6aff'}"><div class="cp">${k.plat}</div><div class="cn">${k.name}</div><div class="cv">${k.val}<span class="cu">${k.unit}</span></div><div class="cc-badge ${cls}">${ct}</div></div>`;
+  }).join('');
+}
+function renderCharts(){
+  Object.values(charts).forEach(c=>c.destroy());charts={};
+  const g=document.getElementById('chartsGrid');
+  if(!kpis.length){g.innerHTML='';return;}
+  const chK=kpis.filter(k=>k.prev!==null&&!isNaN(k.prev));
+  const plats=[...new Set(kpis.map(k=>k.plat))];
+  let html='';
+  if(chK.length)html+='<div class="chart-box"><h4>// KPI CHANGES (%)</h4><canvas id="cChange"></canvas></div>';
+  if(plats.length>1)html+='<div class="chart-box"><h4>// PLATFORM DISTRIBUTION</h4><canvas id="cPlat"></canvas></div>';
+  if(kpis.length>1&&kpis.length<=12)html+='<div class="chart-box"><h4>// CURRENT vs PREVIOUS</h4><canvas id="cVal"></canvas></div>';
+  g.innerHTML=html;
+  Chart.defaults.color='#555570';Chart.defaults.borderColor='#1e1e3a';
+  if(chK.length){
+    const changes=chK.map(k=>calcCh(k));
+    charts.c=new Chart(document.getElementById('cChange').getContext('2d'),{type:'bar',data:{labels:chK.map(k=>k.name),datasets:[{data:changes,backgroundColor:changes.map(c=>c>=0?'rgba(46,204,113,0.65)':'rgba(231,76,60,0.65)'),borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{grid:{color:'#1a1a2e'}},x:{grid:{display:false}}}}});
+  }
+  if(plats.length>1){
+    charts.p=new Chart(document.getElementById('cPlat').getContext('2d'),{type:'doughnut',data:{labels:plats,datasets:[{data:plats.map(p=>kpis.filter(k=>k.plat===p).length),backgroundColor:plats.map(p=>pColors[p]||'#888'),borderColor:'#111120',borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom'}}}});
+  }
+  if(kpis.length>1&&kpis.length<=12){
+    const ds=[{label:'Current',data:kpis.map(k=>k.val),backgroundColor:'rgba(124,106,255,0.65)',borderColor:'#7c6aff',borderWidth:1,borderRadius:4}];
+    if(kpis.some(k=>k.prev!==null))ds.push({label:'Previous',data:kpis.map(k=>k.prev||0),backgroundColor:'rgba(184,169,255,0.25)',borderColor:'#b8a9ff',borderWidth:1,borderRadius:4});
+    charts.v=new Chart(document.getElementById('cVal').getContext('2d'),{type:'bar',data:{labels:kpis.map(k=>k.name),datasets:ds},options:{responsive:true,plugins:{legend:{position:'bottom'}},scales:{y:{grid:{color:'#1a1a2e'}},x:{grid:{display:false}}}}});
+  }
+}
+
+async function analyzeWithAI(){
+  const key=getKey();
+  if(!key){alert('Please enter your OpenAI API Key first');return;}
+  if(!kpis.length){alert('Please add some KPIs first');return;}
+  const out=document.getElementById('aiOutput');
+  out.className='ai-output loading';out.textContent='⏳ Analyzing with ChatGPT...';
+  const type=document.getElementById('aType').value;
+  const summary=kpiSummary();
+  const prompts={
+    full:`KPI data from multiple platforms:\n${summary}\n\nPlease:\n1. Identify declining KPIs and explain probable reasons\n2. Identify improving KPIs and explain success factors\n3. Provide 5 prioritized, actionable recommendations to improve overall performance`,
+    decline:`KPI data:\n${summary}\n\nFocus only on declining KPIs. Analyze probable causes in detail with specific suggestions to fix them.`,
+    improvement:`KPI data:\n${summary}\n\nFocus only on improving KPIs. Analyze what's working and how to amplify these wins.`,
+    recommendations:`KPI data:\n${summary}\n\nProvide 7 specific, prioritized, actionable recommendations to improve digital marketing performance across these platforms.`,
+    forecast:`KPI data:\n${summary}\n\nForecast likely trends based on the current data and provide early warning signals or opportunities to watch for.`
+  };
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:document.getElementById('aiModel').value,messages:[{role:'system',content:'You are a senior digital marketing analyst. Provide clear, structured, data-driven insights with numbered points.'},{role:'user',content:prompts[type]}],temperature:0.7,stream:true})});
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API Error');}
+    out.className='ai-output';out.textContent='';
+    const reader=res.body.getReader(),dec=new TextDecoder();
+    while(true){const{done,value}=await reader.read();if(done)break;for(const line of dec.decode(value).split('\n').filter(l=>l.startsWith('data: '))){const d=line.slice(6);if(d==='[DONE]')break;try{const p=JSON.parse(d);const c=p.choices?.[0]?.delta?.content;if(c)out.textContent+=c;}catch{}}}
+  }catch(e){out.className='ai-output error';out.textContent=`❌ Error: ${e.message}\n\nPlease check:\n• API Key is correct\n• Sufficient OpenAI credits\n• Internet connection is active`;}
+}
+function clearOutput(){const o=document.getElementById('aiOutput');o.className='ai-output';o.textContent='Analysis results will appear here...';}
+
+async function sendChat(){
+  const key=getKey();
+  if(!key){alert('Please enter your OpenAI API Key first');return;}
+  const input=document.getElementById('chatInput');
+  const msg=input.value.trim();if(!msg)return;
+  if(!kpis.length){alert('Please add KPIs or upload a CSV first');return;}
+  input.value='';
+  appendMsg('user',msg);
+  chatHistory.push({role:'user',content:msg});
+  const cm=document.getElementById('chatMessages');
+  const typingEl=document.createElement('div');
+  typingEl.className='msg ai';
+  typingEl.innerHTML='<div class="msg-avatar">🤖</div><div class="msg-bubble" style="padding:0"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
+  cm.appendChild(typingEl);cm.scrollTop=cm.scrollHeight;
+  const sysMsg=`You are a digital marketing data analyst assistant. The user has KPI data from multiple platforms. Here is the data:\n\n${kpiSummary()}\n\nAnswer questions concisely and helpfully. Be specific and reference the actual numbers when relevant.`;
+  const messages=[{role:'system',content:sysMsg},...chatHistory.slice(-12)];
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},body:JSON.stringify({model:document.getElementById('aiModel').value,messages,temperature:0.7,stream:true})});
+    if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API Error');}
+    typingEl.remove();
+    let aiText='';
+    const aiEl=document.createElement('div');
+    const bid='b_'+Date.now();
+    aiEl.className='msg ai';
+    aiEl.innerHTML=`<div class="msg-avatar">🤖</div><div class="msg-bubble" id="${bid}"></div>`;
+    cm.appendChild(aiEl);
+    const reader=res.body.getReader(),dec=new TextDecoder();
+    while(true){const{done,value}=await reader.read();if(done)break;for(const line of dec.decode(value).split('\n').filter(l=>l.startsWith('data: '))){const d=line.slice(6);if(d==='[DONE]')break;try{const p=JSON.parse(d);const c=p.choices?.[0]?.delta?.content;if(c){aiText+=c;document.getElementById(bid).textContent=aiText;cm.scrollTop=cm.scrollHeight;}}catch{}}}
+    chatHistory.push({role:'assistant',content:aiText});
+  }catch(e){typingEl.remove();appendMsg('ai',`❌ Error: ${e.message}`);}
+}
+function appendMsg(role,text){
+  const cm=document.getElementById('chatMessages');
+  const empty=cm.querySelector('.chat-empty');if(empty)empty.remove();
+  const el=document.createElement('div');
+  el.className=`msg ${role}`;
+  el.innerHTML=`<div class="msg-avatar">${role==='user'?'👤':'🤖'}</div><div class="msg-bubble">${text}</div>`;
+  cm.appendChild(el);cm.scrollTop=cm.scrollHeight;
+}
+
+function handleCSV(e){
+  const f=e.target.files[0];if(!f)return;
+  // Try UTF-8 first, fallback to latin1 for Excel exports
+  const r=new FileReader();
+  r.onload=ev=>parseCSV(ev.target.result,f.name);
+  r.onerror=()=>{const r2=new FileReader();r2.onload=ev=>parseCSV(ev.target.result,f.name);r2.readAsText(f,'latin1');};
+  r.readAsText(f,'UTF-8');
+  e.target.value='';
+}
+
+function splitCSVLine(line){
+  // Handles quoted fields, commas inside quotes, semicolons, tabs
+  const result=[];let cur='';let inQ=false;let sep=line.includes('\t')?'\t':line.includes(';')?';':',';
+  for(let i=0;i<line.length;i++){
+    const ch=line[i];
+    if((ch==='"'||ch==="'")&&!inQ){inQ=ch;continue;}
+    if(ch===inQ){inQ=false;continue;}
+    if(ch===sep&&!inQ){result.push(cur.trim());cur='';continue;}
+    cur+=ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function detectSeparator(line){
+  const tabs=line.split('\t').length-1;
+  const semis=line.split(';').length-1;
+  const commas=line.split(',').length-1;
+  if(tabs>commas&&tabs>semis)return'\t';
+  if(semis>commas)return';';
+  return',';
+}
+
+function cleanNum(s){
+  if(!s)return NaN;
+  // Remove currency symbols, spaces, percentage, commas as thousands separator
+  return parseFloat(String(s).replace(/[$€£¥₺,\s]/g,'').replace('%','').trim());
+}
+
+function guessColumn(hdrs,keywords){
+  // Exact match first, then partial match
+  for(const kw of keywords){const x=hdrs.findIndex(h=>h===kw);if(x!==-1)return x;}
+  for(const kw of keywords){const x=hdrs.findIndex(h=>h.includes(kw));if(x!==-1)return x;}
+  return -1;
+}
+
+function guessPlatform(val,name){
+  const v=(val||'').toLowerCase();const n=(name||'').toLowerCase();
+  const combined=v+' '+n;
+  if(combined.match(/google|gads|g-ads|adwords/))return'google';
+  if(combined.match(/meta|facebook|fb|instagram|ig/))return'meta';
+  if(combined.match(/tiktok|tik.tok/))return'tiktok';
+  if(combined.match(/linkedin/))return'linkedin';
+  if(combined.match(/twitter|x\.com/))return'twitter';
+  return'custom';
+}
+
+function parseCSV(text, filename=''){
+  // Remove BOM if present (common in Excel exports)
+  text=text.replace(/^\uFEFF/,'');
+  // Normalize line endings
+  const lines=text.trim().replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(l=>l.trim());
+  if(lines.length<2){alert('❌ CSV file appears empty or has only one row.');return;}
+
+  const sep=detectSeparator(lines[0]);
+  const rawHdrs=lines[0].split(sep).map(h=>h.trim().replace(/['"]/g,''));
+  const hdrs=rawHdrs.map(h=>h.toLowerCase().replace(/[\s_\-]+/g,''));
+
+  // Detect column indices with flexible keywords
+  const iPlat  = guessColumn(hdrs,['platform','channel','source','network','ad_platform','adplatform','media']);
+  const iName  = guessColumn(hdrs,['name','kpi','metric','metricname','kpiname','indicator','measure','label']);
+  const iVal   = guessColumn(hdrs,['value','current','currentvalue','val','actual','result','score','amount','number','data']);
+  const iPrev  = guessColumn(hdrs,['prev','previous','prevvalue','previousvalue','last','prior','before','old','baseline','benchmark']);
+  const iUnit  = guessColumn(hdrs,['unit','units','format','type','suffix']);
+
+  // If no obvious name/value columns, try to auto-map by position
+  // Many exports are just 2 cols: metric_name, metric_value
+  let autoMode=false;
+  let iAutoName=-1,iAutoVal=-1,iAutoPlat=-1;
+  if(iName===-1||iVal===-1){
+    // Find first text-ish column and first numeric column from data rows
+    const sample=splitCSVLine(lines[1]);
+    sample.forEach((v,i)=>{
+      if(!isNaN(cleanNum(v))&&iAutoVal===-1)iAutoVal=i;
+      else if(isNaN(cleanNum(v))&&iAutoName===-1)iAutoName=i;
+    });
+    autoMode=true;
+  }
+
+  let added=0,skipped=0;
+  const preview=[];
+
+  for(let i=1;i<lines.length;i++){
+    const cols=splitCSVLine(lines[i]);
+    if(cols.length<2)continue;
+
+    const get=idx=>idx!==-1&&idx<cols.length?cols[idx].trim().replace(/^['"]|['"]$/g,''):'';
+
+    let name, val, prev, unit, plat;
+
+    if(!autoMode){
+      name = get(iName);
+      val  = cleanNum(get(iVal));
+      prev = cleanNum(get(iPrev));
+      unit = get(iUnit);
+      plat = iPlat!==-1 ? guessPlatform(get(iPlat),name) : guessPlatform('',name);
+    } else {
+      name = get(iAutoName!==-1?iAutoName:0);
+      val  = cleanNum(get(iAutoVal!==-1?iAutoVal:1));
+      prev = NaN; unit=''; plat='custom';
+      // Try all remaining columns for a second number (prev value)
+      for(let c=0;c<cols.length;c++){
+        if(c===iAutoName||c===iAutoVal)continue;
+        const n=cleanNum(cols[c]);
+        if(!isNaN(n)){prev=n;break;}
+      }
+    }
+
+    if(!name||isNaN(val)){skipped++;continue;}
+
+    // Extract unit from value string if not explicit (e.g. "3.5%" or "$120")
+    if(!unit){
+      const raw=iVal!==-1?get(iVal):'';
+      if(raw.includes('%'))unit='%';
+      else if(raw.match(/^\$|USD/))unit='$';
+      else if(raw.match(/€|EUR/))unit='€';
+    }
+
+    kpis.push({id:Date.now()+i,plat,name,val,prev:isNaN(prev)?null:prev,unit});
+    added++;
+    if(preview.length<3)preview.push(`${name}: ${val}${unit}`);
+  }
+
+  if(added>0){
+    render();
+    const msg=`✅ ${added} KPIs imported${skipped>0?` (${skipped} rows skipped)`:''}\n\nPreview: ${preview.join(' · ')}`;
+    alert(msg);
+  } else {
+    alert(`❌ Could not read any KPIs from this CSV.\n\nFile: ${filename}\nHeaders found: ${rawHdrs.join(', ')}\n\nTip: The file needs at least a name column and a numeric value column. Any column names work — the parser will auto-detect them.`);
+  }
+}
+function loadSample(){
+  [{plat:'google',name:'CTR',val:3.2,prev:4.1,unit:'%'},{plat:'google',name:'CPC',val:0.45,prev:0.38,unit:'$'},{plat:'google',name:'ROAS',val:4.8,prev:3.9,unit:'x'},{plat:'meta',name:'CPM',val:8.5,prev:11.2,unit:'$'},{plat:'meta',name:'Reach',val:145000,prev:120000,unit:''},{plat:'meta',name:'Engagement Rate',val:5.3,prev:4.7,unit:'%'},{plat:'tiktok',name:'Video Views',val:89000,prev:65000,unit:''},{plat:'tiktok',name:'Conversion Rate',val:1.8,prev:2.4,unit:'%'},{plat:'linkedin',name:'Lead Cost',val:32,prev:28,unit:'$'},{plat:'linkedin',name:'CTR',val:0.9,prev:0.7,unit:'%'}].forEach((k,i)=>kpis.push({id:Date.now()+i,...k}));
+  render();
+}
+function clearAll(){
+  if(confirm('Clear all KPIs and chat history?')){
+    kpis=[];chatHistory=[];render();clearOutput();
+    document.getElementById('chatMessages').innerHTML='<div class="chat-empty"><div class="ce-icon">💬</div><div>Upload a CSV or add KPIs, then ask anything about your data.</div></div>';
+  }
+}
+const uz=document.getElementById('uploadZone');
+uz.addEventListener('dragover',e=>{e.preventDefault();uz.classList.add('drag');});
+uz.addEventListener('dragleave',()=>uz.classList.remove('drag'));
+uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('drag');const f=e.dataTransfer.files[0];if(f&&f.name.endsWith('.csv')){const r=new FileReader();r.onload=ev=>parseCSV(ev.target.result);r.readAsText(f,'UTF-8');}else alert('Only CSV files supported');});
+const sk=sessionStorage.getItem('oai');
+if(sk){document.getElementById('apiKey').value=sk;document.getElementById('apiStatus').textContent='✅ Connected';document.getElementById('apiStatus').style.color='#2ecc71';}
+</script>
+</body>
+</html>
